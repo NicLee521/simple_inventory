@@ -17,6 +17,7 @@ from ..const import (
     DEFAULT_TODO_LIST,
     DEFAULT_TODO_QUANTITY_PLACEMENT,
     DEFAULT_UNIT,
+    FIELD_ALIASES,
     FIELD_AUTO_ADD_ENABLED,
     FIELD_AUTO_ADD_ID_TO_DESCRIPTION_ENABLED,
     FIELD_AUTO_ADD_TO_LIST_QUANTITY,
@@ -109,17 +110,21 @@ class _ImportExportMixin(_CoordinatorProtocol):
                     continue
 
                 if existing and merge_strategy == "merge_quantities":
-                    new_qty = float(existing.get(FIELD_QUANTITY, 0)) + float(
-                        item_data.get(FIELD_QUANTITY, 0)
-                    )
-                    await self.repository.update_item(existing["id"], {FIELD_QUANTITY: new_qty})
+                    delta = float(item_data.get(FIELD_QUANTITY, 0))
+                    result = await self.repository.adjust_item_quantity(existing["id"], delta)
+                    if result is None:
+                        errors.append(
+                            f"Item '{item_data.get(FIELD_NAME, '?')}' no longer exists, skipped"
+                        )
+                        continue
+                    qty_before, qty_after = result
                     await self.repository.record_history_event(
                         item_id=existing["id"],
                         inventory_id=inventory_id,
                         event_type="import",
-                        amount=float(item_data.get(FIELD_QUANTITY, 0)),
-                        quantity_before=float(existing.get(FIELD_QUANTITY, 0)),
-                        quantity_after=new_qty,
+                        amount=delta,
+                        quantity_before=qty_before,
+                        quantity_after=qty_after,
                         source="import",
                     )
                     updated += 1
@@ -150,6 +155,12 @@ class _ImportExportMixin(_CoordinatorProtocol):
                         await self._apply_category_updates(
                             existing["id"], item_data[FIELD_CATEGORY]
                         )
+                    if FIELD_ALIASES in item_data and item_data[FIELD_ALIASES]:
+                        await self._apply_alias_updates(
+                            inventory_id,
+                            existing["id"],
+                            self._aliases_to_string(item_data[FIELD_ALIASES]),
+                        )
 
                     updated += 1
                     continue
@@ -174,6 +185,10 @@ class _ImportExportMixin(_CoordinatorProtocol):
                     )
                 if FIELD_CATEGORY in item_data and item_data[FIELD_CATEGORY]:
                     await self._apply_category_updates(item_id, item_data[FIELD_CATEGORY])
+                if FIELD_ALIASES in item_data and item_data[FIELD_ALIASES]:
+                    await self._apply_alias_updates(
+                        inventory_id, item_id, self._aliases_to_string(item_data[FIELD_ALIASES])
+                    )
 
                 added += 1
 
@@ -184,6 +199,13 @@ class _ImportExportMixin(_CoordinatorProtocol):
             await self._after_change(inventory_id)
 
         return {"added": added, "updated": updated, "skipped": skipped, "errors": errors}
+
+    @staticmethod
+    def _aliases_to_string(value: Any) -> str:
+        """Normalize an aliases value (list from export, or comma-string) to a comma-string."""
+        if isinstance(value, list):
+            return ", ".join(str(v) for v in value)
+        return str(value)
 
     def _build_import_payload(self, item_data: dict[str, Any]) -> dict[str, Any]:
         """Build a clean item payload from imported data."""
@@ -235,6 +257,7 @@ class _ImportExportMixin(_CoordinatorProtocol):
             "todo_list",
             "todo_quantity_placement",
             "barcodes",
+            "aliases",
         ]
         writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
@@ -261,6 +284,7 @@ class _ImportExportMixin(_CoordinatorProtocol):
                     FIELD_TODO_QUANTITY_PLACEMENT, DEFAULT_TODO_QUANTITY_PLACEMENT
                 ),
                 "barcodes": ", ".join(item.get("barcodes", [])),
+                "aliases": ", ".join(item.get("aliases", [])),
             }
             writer.writerow(row)
 
@@ -293,6 +317,7 @@ class _ImportExportMixin(_CoordinatorProtocol):
                 FIELD_TODO_QUANTITY_PLACEMENT: row.get(
                     "todo_quantity_placement", DEFAULT_TODO_QUANTITY_PLACEMENT
                 ),
+                FIELD_ALIASES: row.get("aliases", ""),
             }
             items.append(item)
         return items

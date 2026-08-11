@@ -2,7 +2,7 @@
 
 # Simple Inventory
 
-A Home Assistant custom integration for managing household inventories. Track items across multiple inventories with expiration dates, automatic todo list integration, barcode support, locations, categories, and change history.
+A Home Assistant custom integration for managing household inventories. Track items across multiple inventories with expiration dates, automatic todo list integration, barcode support, item aliases, locations, categories, and change history.
 
 ## Table of Contents
 
@@ -12,6 +12,7 @@ A Home Assistant custom integration for managing household inventories. Track it
 - [Sensors](#sensors)
 - [Service Calls](#service-calls)
 - [WebSocket API](#websocket-api)
+- [Voice & AI Assistants](#voice--ai-assistants)
 - [Automation Examples](#automation-examples)
 
 ## Installation
@@ -57,6 +58,7 @@ Each item has a **name** (required) and these optional fields:
 | `unit` | Unit of measurement (e.g. "boxes", "L", "kg") |
 | `description` | Free-text description |
 | `barcode` | UPC/EAN barcode for scanning |
+| `aliases` | Alternate names for the item, usable anywhere the name is accepted (comma-separated) |
 | `location` | Where the item is stored (supports multiple, comma-separated) |
 | `category` | Item category (supports multiple, comma-separated) |
 | `price` | Current unit price (updated when restocking or editing) |
@@ -111,6 +113,30 @@ Items can have multiple barcodes associated with them (comma-separated in the AP
 
 > **Important:** Barcodes with leading zeros (e.g. `0123456`) **must be quoted** in YAML automations and scripts. Unquoted values like `barcode: 0123456` are interpreted as integers by YAML, stripping the leading zero and matching the wrong item. Always use `barcode: "0123456"`. This does not affect the HA service call UI or the WebSocket API, which handle strings correctly.
 
+### Item Aliases
+
+Items can have alternate names ("oats", "steel-cut oats", "hot cereal" for
+an item stored as "Oatmeal") that resolve to the same item wherever a name
+is accepted — service calls, voice commands, and LLM tool calls. Set them
+via the `aliases` field on `add_item`/`update_item` (comma-separated, e.g.
+`"oats, steel-cut oats, hot cereal"`); passing an empty string clears all
+aliases.
+
+Every service call and voice/LLM command that looks up an *existing* item
+by name (`remove_item`, `increment_item`, `decrement_item`,
+`update_item`'s `old_name`) resolves aliases automatically, using the same
+typo-tolerant matching already used for real names (exact match, then
+substring, then closest-match) — no per-command setup needed. `add_item`'s
+own `name` field is the one exception: it is never alias-resolved, so
+adding a new item is never silently merged into an existing item because
+of a matching alias.
+
+An alias must be unique within its inventory — assigning an alias already
+taken by another item raises an error. An alias can still coincide with a
+*different* item's real name (e.g. alias "Oats" on "Oatmeal" while a
+separate item is literally named "Oats"); if that happens, the match is
+reported as ambiguous rather than silently resolved to one of them.
+
 ### Change History
 
 Every add, remove, increment, and decrement is recorded with before/after quantities and timestamps. Query history via the WebSocket API.
@@ -151,7 +177,7 @@ The integration fires Home Assistant events on key inventory transitions, enabli
 | `simple_inventory_item_quantity_changed` | Any increment or decrement |
 | `simple_inventory_item_depleted` | Quantity drops to 0 (was > 0) |
 | `simple_inventory_item_restocked` | Quantity rises above 0 (was 0) |
-| `simple_inventory_item_added_to_list` | Item is newly added to a todo list |
+| `simple_inventory_item_added_to_list` | Item is added to a todo list, or its quantity-needed display is updated while already on the list |
 | `simple_inventory_item_removed_from_list` | Item is removed from a todo list |
 
 **Event payloads:**
@@ -238,6 +264,7 @@ data:
   location: "Basement Freezer"
   price: 8.99
   barcode: "012345678901"
+  aliases: "pizza, pepperoni pizza"
   expiry_date: "2026-06-15"
   expiry_alert_days: 7
   auto_add_enabled: true
@@ -298,7 +325,7 @@ data:
 
 ### `simple_inventory.update_item`
 
-Update any fields on an existing item. Use `old_name` to identify the item and `name` for the (possibly new) name.
+Update any fields on an existing item. Use `old_name` to identify the item (also matches aliases) and `name` for the (possibly new) name. Pass `aliases` to replace all of the item's aliases (empty string clears them).
 
 ```yaml
 service: simple_inventory.update_item
@@ -306,6 +333,7 @@ data:
   inventory_id: "01JYFPCDMBRBRK4MB3C26S2FKH"
   old_name: "Frozen Pizza"
   name: "Frozen Pizza"
+  aliases: "pizza night, pepperoni pizza"
   category: "Frozen Foods, Quick Meals"
   location: "Kitchen Freezer"
   expiry_date: "2026-08-01"
@@ -362,7 +390,8 @@ Example response:
       "price": 8.99,
       "description": "Family size pepperoni",
       "barcode": "012345678901",
-      "barcodes": ["012345678901"]
+      "barcodes": ["012345678901"],
+      "aliases": ["pepperoni pizza", "pizza"]
     }
   ]
 }
@@ -716,6 +745,59 @@ Merge strategies:
 - `merge_quantities` — Add imported quantities to existing quantities
 
 Returns: `{ "added": 1, "updated": 0, "skipped": 0, "errors": [] }`
+
+## Voice & AI Assistants
+
+Simple Inventory registers three native Home Assistant intents so you can
+control your inventories by voice or through an LLM-backed conversation
+agent, without writing any automations:
+
+- **Remove/consume an item** — "remove one aluminum foil from the
+  disposable goods inventory"
+- **Add/restock an item** — "add two cans of soup to the pantry"
+- **Query a quantity** — "how many aluminum foil do we have in disposable
+  goods"
+
+Items and inventories are matched by name with typo tolerance (exact match,
+then substring, then closest-match), so you don't need to remember exact
+casing or the internal inventory ID. Items also match by any alias you've
+set on them (see [Item Aliases](#item-aliases)), which is handy for
+giving voice commands a shorter or more natural name than what's stored.
+
+### LLM-backed Assist (OpenAI, Google Generative AI, a local model via Ollama, etc.)
+
+No setup needed beyond configuring the LLM conversation agent itself in
+"Assist" control mode. Simple Inventory ships an `llm.py` platform module
+that contributes its remove/add/query intents as callable tools to Home
+Assistant's Assist API, so any LLM conversation agent using it gets them
+automatically -- no entity exposure required, since these tools resolve
+inventories and items by name rather than acting on Home Assistant
+entities.
+
+### Local/offline Assist (Home Assistant Voice's default pipeline)
+
+If your Home Assistant language is English, check
+**"Install example voice commands"** when adding your first inventory
+(Settings → Devices & Services → Add Integration → Simple Inventory), or
+later via the global Simple Inventory device's **Configure** button. This
+copies a bundled example sentence file into your config directory and
+reloads custom sentences automatically — no restart needed. It never
+overwrites a file that's already there, so it's safe to check even if
+you've already installed it or created your own.
+
+If you'd rather do it by hand — for other languages (only English ships
+today; contributions welcome), to review the content first, or because you
+skipped the checkbox — copy the same file manually:
+
+```bash
+cp custom_components/simple_inventory/data/custom_sentences/en/simple_inventory.yaml \
+   <config>/custom_sentences/en/simple_inventory.yaml
+```
+
+Then reload custom sentences: **Developer Tools → Actions**, call the
+`conversation.reload` action (the same one the checkbox above triggers
+automatically), or just restart Home Assistant. Edit the sentence
+templates in that file to add your own phrasing.
 
 ## Automation Examples
 
