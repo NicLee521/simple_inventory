@@ -18,6 +18,12 @@ class ProductInfo(TypedDict):
     brand: NotRequired[str]
     unit: NotRequired[str]
     image_url: NotRequired[str]
+    servings_per_unit: NotRequired[float]
+    calories_per_serving: NotRequired[float]
+    protein_g_per_serving: NotRequired[float]
+    carbs_g_per_serving: NotRequired[float]
+    fat_g_per_serving: NotRequired[float]
+    serving_size: NotRequired[str]
 
 
 class BarcodeProvider(ABC):

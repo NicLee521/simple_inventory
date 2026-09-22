@@ -71,6 +71,7 @@ async def test_add_inventory_step(
         "description": "Our garage refrigerator",
         "entry_type": "inventory",
         "create_global": True,  # No global entry exists yet
+        "daily_calorie_target": 2000,
     }
 
 

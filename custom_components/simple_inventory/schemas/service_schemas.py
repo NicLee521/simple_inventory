@@ -54,6 +54,12 @@ ITEM_SCHEMA = {
     vol.Optional("todo_quantity_placement"): vol.In(["name", "description", "none"]),
     vol.Optional("unit"): cv.string,
     vol.Optional("price"): vol.All(vol.Coerce(float), vol.Range(min=0)),
+    vol.Optional("servings_per_unit"): vol.All(vol.Coerce(float), vol.Range(min=0)),
+    vol.Optional("calories_per_serving"): vol.All(vol.Coerce(float), vol.Range(min=0)),
+    vol.Optional("protein_g_per_serving"): vol.All(vol.Coerce(float), vol.Range(min=0)),
+    vol.Optional("carbs_g_per_serving"): vol.All(vol.Coerce(float), vol.Range(min=0)),
+    vol.Optional("fat_g_per_serving"): vol.All(vol.Coerce(float), vol.Range(min=0)),
+    vol.Optional("serving_size"): cv.string,
 }
 
 ADD_ITEM_SCHEMA = vol.Schema(

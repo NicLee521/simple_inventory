@@ -18,6 +18,12 @@ from ..const import (
     DEFAULT_EXPIRY_ALERT_DAYS,
     DEFAULT_PRICE,
     DEFAULT_QUANTITY,
+    DEFAULT_SERVINGS_PER_UNIT,
+    DEFAULT_CALORIES_PER_SERVING,
+    DEFAULT_PROTEIN_G_PER_SERVING,
+    DEFAULT_CARBS_G_PER_SERVING,
+    DEFAULT_FAT_G_PER_SERVING,
+    DEFAULT_SERVING_SIZE,
     FIELD_AUTO_ADD_ENABLED,
     FIELD_AUTO_ADD_ID_TO_DESCRIPTION_ENABLED,
     FIELD_AUTO_ADD_TO_LIST_QUANTITY,
@@ -29,6 +35,12 @@ from ..const import (
     FIELD_LOCATION,
     FIELD_NAME,
     FIELD_PRICE,
+    FIELD_SERVINGS_PER_UNIT,
+    FIELD_CALORIES_PER_SERVING,
+    FIELD_PROTEIN_G_PER_SERVING,
+    FIELD_CARBS_G_PER_SERVING,
+    FIELD_FAT_G_PER_SERVING,
+    FIELD_SERVING_SIZE,
     FIELD_QUANTITY,
     FIELD_TODO_LIST,
     FIELD_TODO_QUANTITY_PLACEMENT,
@@ -42,7 +54,7 @@ from ..const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 LEGACY_MIGRATION_FLAG = "legacy_migrated"
 
 
@@ -248,6 +260,12 @@ class InventoryRepository:
                     todo_list TEXT DEFAULT '',
                     todo_quantity_placement TEXT NOT NULL DEFAULT 'name',
                     price REAL NOT NULL DEFAULT 0,
+                    servings_per_unit REAL NOT NULL DEFAULT 0,
+                    calories_per_serving REAL NOT NULL DEFAULT 0,
+                    protein_g_per_serving REAL NOT NULL DEFAULT 0,
+                    carbs_g_per_serving REAL NOT NULL DEFAULT 0,
+                    fat_g_per_serving REAL NOT NULL DEFAULT 0,
+                    serving_size TEXT DEFAULT '',
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (inventory_id) REFERENCES inventories(id) ON DELETE CASCADE,
@@ -341,6 +359,7 @@ class InventoryRepository:
             )
             await self._migrate_to_v2()
             await self._migrate_to_v3()
+            await self._migrate_to_v4()
             return
 
         current_version = int(row[0])
@@ -349,6 +368,8 @@ class InventoryRepository:
                 await self._migrate_to_v2()
             if current_version < 3:
                 await self._migrate_to_v3()
+            if current_version < 4:
+                await self._migrate_to_v4()
             await self._conn.execute(
                 "UPDATE metadata SET value = ? WHERE key = 'schema_version'",
                 (str(SCHEMA_VERSION),),
@@ -400,6 +421,21 @@ class InventoryRepository:
             await self._conn.execute(
                 "ALTER TABLE consumption_history ADD COLUMN price REAL NOT NULL DEFAULT 0"
             )
+
+    async def _migrate_to_v4(self) -> None:
+        """Add nutrition fields to items (schema v3 -> v4)."""
+        assert self._conn is not None
+        columns = [
+            ("servings_per_unit", "REAL NOT NULL DEFAULT 0"),
+            ("calories_per_serving", "REAL NOT NULL DEFAULT 0"),
+            ("protein_g_per_serving", "REAL NOT NULL DEFAULT 0"),
+            ("carbs_g_per_serving", "REAL NOT NULL DEFAULT 0"),
+            ("fat_g_per_serving", "REAL NOT NULL DEFAULT 0"),
+            ("serving_size", "TEXT DEFAULT ''"),
+        ]
+        for name, definition in columns:
+            with contextlib.suppress(Exception):
+                await self._conn.execute(f"ALTER TABLE items ADD COLUMN {name} {definition}")
 
     def _connection(self) -> aiosqlite.Connection:
         """Accessor for the open connection."""
@@ -514,6 +550,18 @@ class InventoryRepository:
             FIELD_TODO_LIST: data.get(FIELD_TODO_LIST, ""),
             FIELD_TODO_QUANTITY_PLACEMENT: data.get(FIELD_TODO_QUANTITY_PLACEMENT, "name"),
             FIELD_PRICE: data.get(FIELD_PRICE, DEFAULT_PRICE),
+            FIELD_SERVINGS_PER_UNIT: data.get(FIELD_SERVINGS_PER_UNIT, DEFAULT_SERVINGS_PER_UNIT),
+            FIELD_CALORIES_PER_SERVING: data.get(
+                FIELD_CALORIES_PER_SERVING, DEFAULT_CALORIES_PER_SERVING
+            ),
+            FIELD_PROTEIN_G_PER_SERVING: data.get(
+                FIELD_PROTEIN_G_PER_SERVING, DEFAULT_PROTEIN_G_PER_SERVING
+            ),
+            FIELD_CARBS_G_PER_SERVING: data.get(
+                FIELD_CARBS_G_PER_SERVING, DEFAULT_CARBS_G_PER_SERVING
+            ),
+            FIELD_FAT_G_PER_SERVING: data.get(FIELD_FAT_G_PER_SERVING, DEFAULT_FAT_G_PER_SERVING),
+            FIELD_SERVING_SIZE: data.get(FIELD_SERVING_SIZE, DEFAULT_SERVING_SIZE),
         }
 
         conn = self._connection()
@@ -533,6 +581,12 @@ class InventoryRepository:
             payload[FIELD_TODO_LIST],
             payload[FIELD_TODO_QUANTITY_PLACEMENT],
             payload[FIELD_PRICE],
+            payload[FIELD_SERVINGS_PER_UNIT],
+            payload[FIELD_CALORIES_PER_SERVING],
+            payload[FIELD_PROTEIN_G_PER_SERVING],
+            payload[FIELD_CARBS_G_PER_SERVING],
+            payload[FIELD_FAT_G_PER_SERVING],
+            payload[FIELD_SERVING_SIZE],
         )
 
         async with self._lock:
@@ -543,9 +597,11 @@ class InventoryRepository:
                     expiry_date, expiry_alert_days,
                     auto_add_enabled, auto_add_id_to_description_enabled,
                     auto_add_to_list_quantity, desired_quantity, todo_list,
-                    todo_quantity_placement, price
+                    todo_quantity_placement, price, servings_per_unit,
+                    calories_per_serving, protein_g_per_serving, carbs_g_per_serving,
+                    fat_g_per_serving, serving_size
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(inventory_id, name) DO UPDATE SET
                     quantity = items.quantity + excluded.quantity,
                     description = CASE
@@ -574,6 +630,12 @@ class InventoryRepository:
                         WHEN excluded.price > 0 THEN excluded.price
                         ELSE items.price
                     END,
+                    servings_per_unit = excluded.servings_per_unit,
+                    calories_per_serving = excluded.calories_per_serving,
+                    protein_g_per_serving = excluded.protein_g_per_serving,
+                    carbs_g_per_serving = excluded.carbs_g_per_serving,
+                    fat_g_per_serving = excluded.fat_g_per_serving,
+                    serving_size = excluded.serving_size,
                     updated_at = CURRENT_TIMESTAMP
                 RETURNING id
                 """,
@@ -601,6 +663,12 @@ class InventoryRepository:
             FIELD_TODO_LIST: "todo_list",
             FIELD_TODO_QUANTITY_PLACEMENT: "todo_quantity_placement",
             FIELD_PRICE: "price",
+            FIELD_SERVINGS_PER_UNIT: "servings_per_unit",
+            FIELD_CALORIES_PER_SERVING: "calories_per_serving",
+            FIELD_PROTEIN_G_PER_SERVING: "protein_g_per_serving",
+            FIELD_CARBS_G_PER_SERVING: "carbs_g_per_serving",
+            FIELD_FAT_G_PER_SERVING: "fat_g_per_serving",
+            FIELD_SERVING_SIZE: "serving_size",
         }
 
         fields: list[str] = []
@@ -679,6 +747,12 @@ class InventoryRepository:
                 todo_list,
                 todo_quantity_placement,
                 price,
+                servings_per_unit,
+                calories_per_serving,
+                protein_g_per_serving,
+                carbs_g_per_serving,
+                fat_g_per_serving,
+                serving_size,
                 created_at,
                 updated_at
             FROM items
@@ -709,8 +783,14 @@ class InventoryRepository:
                 FIELD_TODO_LIST: row[11],
                 FIELD_TODO_QUANTITY_PLACEMENT: row[12],
                 FIELD_PRICE: row[13],
-                "created_at": row[14],
-                "updated_at": row[15],
+                FIELD_SERVINGS_PER_UNIT: row[14],
+                FIELD_CALORIES_PER_SERVING: row[15],
+                FIELD_PROTEIN_G_PER_SERVING: row[16],
+                FIELD_CARBS_G_PER_SERVING: row[17],
+                FIELD_FAT_G_PER_SERVING: row[18],
+                FIELD_SERVING_SIZE: row[19],
+                "created_at": row[20],
+                "updated_at": row[21],
                 FIELD_CATEGORY: "",
                 FIELD_LOCATION: "",
                 "locations": [],
@@ -805,7 +885,9 @@ class InventoryRepository:
                    expiry_date, expiry_alert_days, auto_add_enabled,
                    auto_add_id_to_description_enabled, auto_add_to_list_quantity,
                    desired_quantity, todo_list, todo_quantity_placement,
-                   price, created_at, updated_at
+                   price, servings_per_unit, calories_per_serving,
+                   protein_g_per_serving, carbs_g_per_serving, fat_g_per_serving,
+                   serving_size, created_at, updated_at
             FROM items
             WHERE inventory_id = ?
               AND name = ?
@@ -833,8 +915,14 @@ class InventoryRepository:
             FIELD_TODO_LIST: row[12],
             FIELD_TODO_QUANTITY_PLACEMENT: row[13],
             FIELD_PRICE: row[14],
-            "created_at": row[15],
-            "updated_at": row[16],
+            FIELD_SERVINGS_PER_UNIT: row[15],
+            FIELD_CALORIES_PER_SERVING: row[16],
+            FIELD_PROTEIN_G_PER_SERVING: row[17],
+            FIELD_CARBS_G_PER_SERVING: row[18],
+            FIELD_FAT_G_PER_SERVING: row[19],
+            FIELD_SERVING_SIZE: row[20],
+            "created_at": row[21],
+            "updated_at": row[22],
         }
 
     async def ensure_location(self, inventory_id: str, name: str) -> int:
@@ -946,7 +1034,9 @@ class InventoryRepository:
                    i.auto_add_enabled, i.auto_add_id_to_description_enabled,
                    i.auto_add_to_list_quantity, i.desired_quantity,
                    i.todo_list, i.todo_quantity_placement,
-                   i.price, i.created_at, i.updated_at
+                   i.price, i.servings_per_unit, i.calories_per_serving,
+                   i.protein_g_per_serving, i.carbs_g_per_serving, i.fat_g_per_serving,
+                   i.serving_size, i.created_at, i.updated_at
             FROM items i
             JOIN item_barcodes ib ON ib.item_id = i.id
             WHERE ib.inventory_id = ?
@@ -975,8 +1065,14 @@ class InventoryRepository:
             FIELD_TODO_LIST: row[12],
             FIELD_TODO_QUANTITY_PLACEMENT: row[13],
             FIELD_PRICE: row[14],
-            "created_at": row[15],
-            "updated_at": row[16],
+            FIELD_SERVINGS_PER_UNIT: row[15],
+            FIELD_CALORIES_PER_SERVING: row[16],
+            FIELD_PROTEIN_G_PER_SERVING: row[17],
+            FIELD_CARBS_G_PER_SERVING: row[18],
+            FIELD_FAT_G_PER_SERVING: row[19],
+            FIELD_SERVING_SIZE: row[20],
+            "created_at": row[21],
+            "updated_at": row[22],
         }
 
     async def get_item_by_barcode_global(self, barcode: str) -> list[dict[str, Any]]:
@@ -990,7 +1086,9 @@ class InventoryRepository:
                    i.auto_add_enabled, i.auto_add_id_to_description_enabled,
                    i.auto_add_to_list_quantity, i.desired_quantity,
                    i.todo_list, i.todo_quantity_placement,
-                   i.price, i.created_at, i.updated_at
+                   i.price, i.servings_per_unit, i.calories_per_serving,
+                   i.protein_g_per_serving, i.carbs_g_per_serving, i.fat_g_per_serving,
+                   i.serving_size, i.created_at, i.updated_at
             FROM items i
             JOIN item_barcodes ib ON ib.item_id = i.id
             JOIN inventories inv ON inv.id = i.inventory_id
@@ -1019,8 +1117,14 @@ class InventoryRepository:
                 FIELD_TODO_LIST: row[13],
                 FIELD_TODO_QUANTITY_PLACEMENT: row[14],
                 FIELD_PRICE: row[15],
-                "created_at": row[16],
-                "updated_at": row[17],
+                FIELD_SERVINGS_PER_UNIT: row[16],
+                FIELD_CALORIES_PER_SERVING: row[17],
+                FIELD_PROTEIN_G_PER_SERVING: row[18],
+                FIELD_CARBS_G_PER_SERVING: row[19],
+                FIELD_FAT_G_PER_SERVING: row[20],
+                FIELD_SERVING_SIZE: row[21],
+                "created_at": row[22],
+                "updated_at": row[23],
             }
             for row in rows
         ]

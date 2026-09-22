@@ -13,7 +13,7 @@ from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector, translation
 
-from .const import DOMAIN
+from .const import DEFAULT_DAILY_CALORIE_TARGET, DOMAIN
 from .voice_sentences import async_install_voice_sentences, can_offer_voice_sentences
 
 _LOGGER = logging.getLogger(__name__)
@@ -77,6 +77,9 @@ class SimpleInventoryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         "description": user_input.get("description", ""),
                         "entry_type": "inventory",
                         "create_global": is_first_inventory,
+                        "daily_calorie_target": user_input.get(
+                            "daily_calorie_target", DEFAULT_DAILY_CALORIE_TARGET
+                        ),
                     },
                 )
 
@@ -88,6 +91,10 @@ class SimpleInventoryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "icon", default=defaults.get("icon", DEFAULT_ICON)
             ): selector.IconSelector(),
             vol.Optional("description", default=defaults.get("description", "")): cv.string,
+            vol.Optional(
+                "daily_calorie_target",
+                default=defaults.get("daily_calorie_target", DEFAULT_DAILY_CALORIE_TARGET),
+            ): vol.All(vol.Coerce(float), vol.Range(min=1)),
         }
         if offer_voice_sentences:
             schema_dict[
@@ -156,6 +163,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     "name": cleaned_name,
                     "icon": user_input.get("icon", DEFAULT_ICON),
                     "description": user_input.get("description", ""),
+                    "daily_calorie_target": user_input.get(
+                        "daily_calorie_target", DEFAULT_DAILY_CALORIE_TARGET
+                    ),
                 }
 
                 self.hass.config_entries.async_update_entry(
@@ -186,6 +196,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 "description",
                 default=self._config_entry.data.get("description", ""),
             ): cv.string,
+            vol.Optional(
+                "daily_calorie_target",
+                default=self._config_entry.data.get(
+                    "daily_calorie_target", DEFAULT_DAILY_CALORIE_TARGET
+                ),
+            ): vol.All(vol.Coerce(float), vol.Range(min=1)),
         }
         if offer_voice_sentences:
             schema_dict[

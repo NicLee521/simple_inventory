@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import aiohttp
@@ -13,7 +14,7 @@ from .base import BarcodeProvider, ProductInfo
 
 _LOGGER = logging.getLogger(__name__)
 
-_FIELDS = "product_name,brands,categories,generic_name,quantity,image_url"
+_FIELDS = "product_name,brands,categories,generic_name,quantity,image_url,serving_size,nutriments"
 _USER_AGENT = "SimpleInventory/1.0 (HomeAssistant Integration)"
 _TIMEOUT = aiohttp.ClientTimeout(total=10)
 _MAX_CATEGORIES = 3
@@ -84,7 +85,64 @@ class OpenFoodFactsProvider(BarcodeProvider):
         if image_url:
             result["image_url"] = image_url
 
+        serving_size = str(product.get("serving_size", "")).strip()
+        if serving_size:
+            result["serving_size"] = serving_size
+
+        nutriments = product.get("nutriments", {})
+        if isinstance(nutriments, dict):
+            serving_grams = _extract_grams(serving_size)
+            nutrition_fields = {
+                "calories_per_serving": _nutrition_value(nutriments, "energy-kcal", serving_grams),
+                "protein_g_per_serving": _nutrition_value(nutriments, "proteins", serving_grams),
+                "carbs_g_per_serving": _nutrition_value(nutriments, "carbohydrates", serving_grams),
+                "fat_g_per_serving": _nutrition_value(nutriments, "fat", serving_grams),
+            }
+            for field, value in nutrition_fields.items():
+                if value is not None:
+                    result[field] = value
+
+            quantity_grams = _extract_grams(unit)
+            if quantity_grams and serving_grams:
+                result["servings_per_unit"] = round(quantity_grams / serving_grams, 4)
+
         return result
+
+
+def _extract_grams(value: str) -> float | None:
+    """Extract a gram quantity from a serving or package-size string."""
+    match = re.search(r"([0-9]+(?:[.,][0-9]+)?)\s*g(?:rammes?)?\b", value.lower())
+    if not match:
+        return None
+    try:
+        return float(match.group(1).replace(",", "."))
+    except ValueError:
+        return None
+
+
+def _nutrition_value(
+    nutriments: dict[str, Any], nutrient: str, serving_grams: float | None
+) -> float | None:
+    """Read a per-serving nutrient, falling back to the product's per-100g value."""
+    serving_value = nutriments.get(f"{nutrient}_serving")
+    if serving_value is not None:
+        return _as_float(serving_value)
+
+    per_100g = _as_float(nutriments.get(f"{nutrient}_100g"))
+    if per_100g is None:
+        return None
+    if serving_grams is None:
+        return per_100g
+    return per_100g * serving_grams / 100
+
+
+def _as_float(value: Any) -> float | None:
+    """Convert provider nutrition values to finite non-negative floats."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    return result if result >= 0 else None
 
 
 def _strip_lang_prefix(category: str) -> str:

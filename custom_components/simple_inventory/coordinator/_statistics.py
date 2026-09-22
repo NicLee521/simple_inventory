@@ -11,6 +11,7 @@ from homeassistant.util import dt as dt_util
 
 from ..const import (
     DEFAULT_CATEGORY,
+    DEFAULT_DAILY_CALORIE_TARGET,
     DEFAULT_DESIRED_QUANTITY,
     DEFAULT_EXPIRY_ALERT_DAYS,
     DEFAULT_LOCATION,
@@ -24,6 +25,11 @@ from ..const import (
     FIELD_LOCATION,
     FIELD_NAME,
     FIELD_PRICE,
+    FIELD_SERVINGS_PER_UNIT,
+    FIELD_CALORIES_PER_SERVING,
+    FIELD_PROTEIN_G_PER_SERVING,
+    FIELD_CARBS_G_PER_SERVING,
+    FIELD_FAT_G_PER_SERVING,
     FIELD_QUANTITY,
     FIELD_UNIT,
     compute_quantity_needed,
@@ -31,6 +37,28 @@ from ..const import (
 from ._protocol import _CoordinatorProtocol
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _calculate_nutrition_totals(
+    items: list[dict[str, Any]], daily_calorie_target: float
+) -> dict[str, float]:
+    """Calculate aggregate servings and macronutrients for inventory items."""
+    totals = {
+        "total_servings": 0.0,
+        "total_calories": 0.0,
+        "total_protein_g": 0.0,
+        "total_carbs_g": 0.0,
+        "total_fat_g": 0.0,
+    }
+    for item in items:
+        servings = float(item.get(FIELD_QUANTITY, 0)) * float(item.get(FIELD_SERVINGS_PER_UNIT, 0))
+        totals["total_servings"] += servings
+        totals["total_calories"] += servings * float(item.get(FIELD_CALORIES_PER_SERVING, 0))
+        totals["total_protein_g"] += servings * float(item.get(FIELD_PROTEIN_G_PER_SERVING, 0))
+        totals["total_carbs_g"] += servings * float(item.get(FIELD_CARBS_G_PER_SERVING, 0))
+        totals["total_fat_g"] += servings * float(item.get(FIELD_FAT_G_PER_SERVING, 0))
+    totals["days_of_food"] = totals["total_calories"] / daily_calorie_target
+    return totals
 
 
 def _is_low_stock(item: dict[str, Any]) -> bool:
@@ -77,6 +105,12 @@ class _StatisticsMixin(_CoordinatorProtocol):
             for item in items
             if float(item.get(FIELD_PRICE, 0)) > 0
         )
+        daily_calorie_target = float(
+            self.entry.data.get("daily_calorie_target", DEFAULT_DAILY_CALORIE_TARGET)
+            or DEFAULT_DAILY_CALORIE_TARGET
+        )
+        daily_calorie_target = max(1, daily_calorie_target)
+        nutrition = _calculate_nutrition_totals(items, daily_calorie_target)
 
         expiring_items = await self.async_get_items_expiring_soon(inventory_id)
 
@@ -84,6 +118,9 @@ class _StatisticsMixin(_CoordinatorProtocol):
             "total_items": total_items,
             "total_quantity": total_quantity,
             "total_value": total_value,
+            "daily_calorie_target": daily_calorie_target,
+            **nutrition,
+            "nutrition": nutrition,
             "categories": categories,
             "locations": locations,
             "below_threshold": below_threshold,

@@ -1,7 +1,7 @@
 """Service handlers for Simple Inventory integration."""
 
 import logging
-from typing import cast
+from typing import Any, cast
 
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ServiceValidationError
@@ -110,13 +110,20 @@ class ServiceHandler:
             existing = await coordinator.async_lookup_by_barcode(barcode)
             if existing:
                 item = existing[0]
-                product: dict[str, str] = {"name": item.get("name", "")}
-                if item.get("description"):
-                    product["description"] = item["description"]
-                if item.get("category"):
-                    product["category"] = item["category"]
-                if item.get("unit"):
-                    product["unit"] = item["unit"]
+                product: dict[str, Any] = {"name": item.get("name", "")}
+                for field in (
+                    "description",
+                    "category",
+                    "unit",
+                    "servings_per_unit",
+                    "calories_per_serving",
+                    "protein_g_per_serving",
+                    "carbs_g_per_serving",
+                    "fat_g_per_serving",
+                    "serving_size",
+                ):
+                    if item.get(field) not in (None, ""):
+                        product[field] = item[field]
                 results = [{"provider": "inventory", "found": True, "product": product}]
                 return cast(JsonObjectType, {"barcode": barcode, "results": results})
 

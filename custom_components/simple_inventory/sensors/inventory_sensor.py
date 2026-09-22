@@ -8,7 +8,7 @@ from typing import Any
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import Event, HomeAssistant, callback
 
-from ..const import DOMAIN
+from ..const import DEFAULT_DAILY_CALORIE_TARGET, DOMAIN
 from ..coordinator import SimpleInventoryCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -77,6 +77,13 @@ class InventorySensor(SensorEntity):
             "description": description,
             "total_items": stats["total_items"],
             "total_quantity": stats["total_quantity"],
+            "total_servings": stats.get("total_servings", 0),
+            "total_calories": stats.get("total_calories", 0),
+            "total_protein_g": stats.get("total_protein_g", 0),
+            "total_carbs_g": stats.get("total_carbs_g", 0),
+            "total_fat_g": stats.get("total_fat_g", 0),
+            "daily_calorie_target": stats.get("daily_calorie_target", DEFAULT_DAILY_CALORIE_TARGET),
+            "days_of_food": stats.get("days_of_food", 0),
             "below_threshold": stats["below_threshold"],
             "expiring_soon": len(stats["expiring_items"]),
         }

@@ -21,6 +21,12 @@ from ..const import (
     DEFAULT_LOCATION,
     DEFAULT_PRICE,
     DEFAULT_QUANTITY,
+    DEFAULT_SERVINGS_PER_UNIT,
+    DEFAULT_CALORIES_PER_SERVING,
+    DEFAULT_PROTEIN_G_PER_SERVING,
+    DEFAULT_CARBS_G_PER_SERVING,
+    DEFAULT_FAT_G_PER_SERVING,
+    DEFAULT_SERVING_SIZE,
     DEFAULT_TODO_LIST,
     DEFAULT_TODO_QUANTITY_PLACEMENT,
     DEFAULT_UNIT,
@@ -43,6 +49,12 @@ from ..const import (
     FIELD_LOCATION,
     FIELD_NAME,
     FIELD_PRICE,
+    FIELD_SERVINGS_PER_UNIT,
+    FIELD_CALORIES_PER_SERVING,
+    FIELD_PROTEIN_G_PER_SERVING,
+    FIELD_CARBS_G_PER_SERVING,
+    FIELD_FAT_G_PER_SERVING,
+    FIELD_SERVING_SIZE,
     FIELD_QUANTITY,
     FIELD_TODO_LIST,
     FIELD_TODO_QUANTITY_PLACEMENT,
@@ -67,6 +79,11 @@ class SimpleInventoryCoordinator(_StatisticsMixin, _ImportExportMixin, _Analytic
         FIELD_AUTO_ADD_TO_LIST_QUANTITY,
         FIELD_DESIRED_QUANTITY,
         FIELD_PRICE,
+        FIELD_SERVINGS_PER_UNIT,
+        FIELD_CALORIES_PER_SERVING,
+        FIELD_PROTEIN_G_PER_SERVING,
+        FIELD_CARBS_G_PER_SERVING,
+        FIELD_FAT_G_PER_SERVING,
     }
     _BOOLEAN_FIELDS = {
         FIELD_AUTO_ADD_ENABLED,
@@ -80,6 +97,7 @@ class SimpleInventoryCoordinator(_StatisticsMixin, _ImportExportMixin, _Analytic
         FIELD_TODO_LIST,
         FIELD_TODO_QUANTITY_PLACEMENT,
         FIELD_LOCATION,
+        FIELD_SERVING_SIZE,
     }
 
     def __init__(
@@ -177,6 +195,22 @@ class SimpleInventoryCoordinator(_StatisticsMixin, _ImportExportMixin, _Analytic
                 0,
                 float(kwargs.get(FIELD_PRICE, DEFAULT_PRICE)),
             ),
+            FIELD_SERVINGS_PER_UNIT: max(
+                0, float(kwargs.get(FIELD_SERVINGS_PER_UNIT, DEFAULT_SERVINGS_PER_UNIT))
+            ),
+            FIELD_CALORIES_PER_SERVING: max(
+                0, float(kwargs.get(FIELD_CALORIES_PER_SERVING, DEFAULT_CALORIES_PER_SERVING))
+            ),
+            FIELD_PROTEIN_G_PER_SERVING: max(
+                0, float(kwargs.get(FIELD_PROTEIN_G_PER_SERVING, DEFAULT_PROTEIN_G_PER_SERVING))
+            ),
+            FIELD_CARBS_G_PER_SERVING: max(
+                0, float(kwargs.get(FIELD_CARBS_G_PER_SERVING, DEFAULT_CARBS_G_PER_SERVING))
+            ),
+            FIELD_FAT_G_PER_SERVING: max(
+                0, float(kwargs.get(FIELD_FAT_G_PER_SERVING, DEFAULT_FAT_G_PER_SERVING))
+            ),
+            FIELD_SERVING_SIZE: kwargs.get(FIELD_SERVING_SIZE, DEFAULT_SERVING_SIZE),
         }
 
         item_id = await self.repository.create_item(inventory_id, item_payload)
@@ -799,6 +833,12 @@ class SimpleInventoryCoordinator(_StatisticsMixin, _ImportExportMixin, _Analytic
             FIELD_TODO_QUANTITY_PLACEMENT,
             FIELD_UNIT,
             FIELD_LOCATION,
+            FIELD_SERVINGS_PER_UNIT,
+            FIELD_CALORIES_PER_SERVING,
+            FIELD_PROTEIN_G_PER_SERVING,
+            FIELD_CARBS_G_PER_SERVING,
+            FIELD_FAT_G_PER_SERVING,
+            FIELD_SERVING_SIZE,
         }
 
     def _process_description_update(

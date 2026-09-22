@@ -943,13 +943,13 @@ async def test_schema_migration_v1_to_v2(
     await repo.async_initialize()
 
     try:
-        # Verify schema version is now 3
+        # Verify schema version is now 4
         conn = repo._connection()
         cursor = await conn.execute("SELECT value FROM metadata WHERE key = 'schema_version'")
         row = await cursor.fetchone()
         await cursor.close()
         assert row is not None
-        assert int(row[0]) == 3
+        assert int(row[0]) == 4
 
         # Verify consumption_history table exists
         cursor = await conn.execute(

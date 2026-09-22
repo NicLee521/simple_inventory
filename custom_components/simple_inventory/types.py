@@ -12,6 +12,12 @@ if TYPE_CHECKING:
 class AddItemServiceData(TypedDict):
     """Type for add item service call data."""
 
+    servings_per_unit: NotRequired[float]
+    calories_per_serving: NotRequired[float]
+    protein_g_per_serving: NotRequired[float]
+    carbs_g_per_serving: NotRequired[float]
+    fat_g_per_serving: NotRequired[float]
+    serving_size: NotRequired[str]
     aliases: NotRequired[str]
     auto_add_enabled: NotRequired[bool]
     auto_add_id_to_description_enabled: NotRequired[bool]
@@ -36,6 +42,12 @@ class AddItemServiceData(TypedDict):
 class UpdateItemServiceData(TypedDict):
     """Type for update item service call data."""
 
+    servings_per_unit: NotRequired[float]
+    calories_per_serving: NotRequired[float]
+    protein_g_per_serving: NotRequired[float]
+    carbs_g_per_serving: NotRequired[float]
+    fat_g_per_serving: NotRequired[float]
+    serving_size: NotRequired[str]
     aliases: NotRequired[str]
     auto_add_enabled: NotRequired[bool]
     auto_add_id_to_description_enabled: NotRequired[bool]
@@ -85,6 +97,12 @@ class GetAllItemsServiceData(TypedDict, total=False):
 class InventoryItem(TypedDict, total=False):
     """Type definition for inventory item data."""
 
+    servings_per_unit: float
+    calories_per_serving: float
+    protein_g_per_serving: float
+    carbs_g_per_serving: float
+    fat_g_per_serving: float
+    serving_size: str
     auto_add_enabled: bool
     auto_add_id_to_description_enabled: bool
     auto_add_to_list_quantity: float

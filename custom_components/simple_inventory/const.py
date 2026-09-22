@@ -45,6 +45,12 @@ FIELD_TODO_LIST: Final = "todo_list"
 FIELD_TODO_QUANTITY_PLACEMENT: Final = "todo_quantity_placement"
 FIELD_TO_LOCATION: Final = "to_location"
 FIELD_PRICE: Final = "price"
+FIELD_SERVINGS_PER_UNIT: Final = "servings_per_unit"
+FIELD_CALORIES_PER_SERVING: Final = "calories_per_serving"
+FIELD_PROTEIN_G_PER_SERVING: Final = "protein_g_per_serving"
+FIELD_CARBS_G_PER_SERVING: Final = "carbs_g_per_serving"
+FIELD_FAT_G_PER_SERVING: Final = "fat_g_per_serving"
+FIELD_SERVING_SIZE: Final = "serving_size"
 FIELD_UNIT: Final = "unit"
 
 DEFAULT_AUTO_ADD_ENABLED: Final = False
@@ -59,6 +65,13 @@ DEFAULT_TODO_QUANTITY_PLACEMENT: Final = "name"
 DEFAULT_UNIT: Final = ""
 DEFAULT_LOCATION: Final = ""
 DEFAULT_PRICE: Final = 0
+DEFAULT_DAILY_CALORIE_TARGET: Final = 2000
+DEFAULT_SERVINGS_PER_UNIT: Final = 0
+DEFAULT_CALORIES_PER_SERVING: Final = 0
+DEFAULT_PROTEIN_G_PER_SERVING: Final = 0
+DEFAULT_CARBS_G_PER_SERVING: Final = 0
+DEFAULT_FAT_G_PER_SERVING: Final = 0
+DEFAULT_SERVING_SIZE: Final = ""
 
 ANALYTICS_MIN_EVENTS: Final = 2
 

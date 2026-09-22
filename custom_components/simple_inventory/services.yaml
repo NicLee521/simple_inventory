@@ -144,6 +144,51 @@ add_item:
             - "name"
             - "description"
             - "none"
+    servings_per_unit:
+      description: Number of servings in each inventory unit
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          step: 0.1
+    calories_per_serving:
+      description: Calories per serving
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+    protein_g_per_serving:
+      description: Protein grams per serving
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          step: 0.1
+    carbs_g_per_serving:
+      description: Carbohydrates grams per serving
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          step: 0.1
+    fat_g_per_serving:
+      description: Fat grams per serving
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          step: 0.1
+    serving_size:
+      description: Serving size description
+      required: false
+      default: ""
+      selector:
+        text:
 
 remove_item:
   description: Remove an item from an inventory
@@ -404,6 +449,45 @@ update_item:
             - "name"
             - "description"
             - "none"
+    servings_per_unit:
+      description: Number of servings in each inventory unit
+      required: false
+      selector:
+        number:
+          min: 0
+          step: 0.1
+    calories_per_serving:
+      description: Calories per serving
+      required: false
+      selector:
+        number:
+          min: 0
+    protein_g_per_serving:
+      description: Protein grams per serving
+      required: false
+      selector:
+        number:
+          min: 0
+          step: 0.1
+    carbs_g_per_serving:
+      description: Carbohydrates grams per serving
+      required: false
+      selector:
+        number:
+          min: 0
+          step: 0.1
+    fat_g_per_serving:
+      description: Fat grams per serving
+      required: false
+      selector:
+        number:
+          min: 0
+          step: 0.1
+    serving_size:
+      description: Serving size description
+      required: false
+      selector:
+        text:
 
 get_items:
   description: Return the full list of items for an inventory. Can specify either inventory_id or inventory_name (but not both).
