@@ -31,6 +31,7 @@ class BarcodeProvider(ABC):
 
     def __init__(self, hass: HomeAssistant) -> None:
         """Initialize with a Home Assistant instance."""
+        super().__init__()
 
     @property
     @abstractmethod
@@ -43,3 +44,4 @@ class BarcodeProvider(ABC):
 
     async def async_close(self) -> None:
         """Clean up provider resources. Default no-op."""
+        return None

@@ -11,6 +11,7 @@ class _CoordinatorProtocol(Protocol):
     """Structural type describing the attributes/methods mixins depend on."""
 
     repository: InventoryRepository
+    entry: Any
 
     async def async_initialize(self) -> None:
         pass

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+from typing import Any, cast
 
 import aiohttp
 from homeassistant.core import HomeAssistant
@@ -98,9 +98,16 @@ class OpenFoodFactsProvider(BarcodeProvider):
                 "carbs_g_per_serving": _nutrition_value(nutriments, "carbohydrates", serving_grams),
                 "fat_g_per_serving": _nutrition_value(nutriments, "fat", serving_grams),
             }
-            for field, value in nutrition_fields.items():
-                if value is not None:
-                    result[field] = value
+            result.update(
+                cast(
+                    Any,
+                    {
+                        field: value
+                        for field, value in nutrition_fields.items()
+                        if value is not None
+                    },
+                )
+            )
 
             quantity_grams = _extract_grams(unit)
             if quantity_grams and serving_grams:
